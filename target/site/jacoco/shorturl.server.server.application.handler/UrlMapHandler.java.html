@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UrlMapHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">shortUrl-server</a> &gt; <a href="index.source.html" class="el_package">shorturl.server.server.application.handler</a> &gt; <span class="el_source">UrlMapHandler.java</span></div><h1>UrlMapHandler.java</h1><pre class="source lang-java linenums">package shorturl.server.server.application.handler;
+
+import com.github.benmanes.caffeine.cache.Cache;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
+import shorturl.server.server.application.dto.UrlRequest;
+import shorturl.server.server.application.dto.UrlResponse;
+import shorturl.server.server.application.util.ConversionUtil;
+import shorturl.server.server.application.util.IdWorkerInstance;
+
+<span class="fc" id="L15">@Slf4j</span>
+@Component
+<span class="fc" id="L17">public class UrlMapHandler implements Handler{</span>
+    private static final String LONG2SHORTURL = &quot;长链接转短连接&quot;;
+    private static final String SHORT2LONGURL = &quot;根据短链接获取长链接&quot;;
+
+    //缓存要生成缓存
+    @Autowired
+    Cache&lt;String, String&gt; caffeineCache;
+
+    @Value(&quot;${shorturl.prefix}&quot;)
+    private String shortUrlPrefix;
+
+    @Override
+    public void handle(UrlRequest urlReq, UrlResponse urlResponse){
+<span class="nc" id="L30">        log.info(&quot;urlResonse {}&quot;, urlResponse.getDescription());</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">       if( StringUtils.equals(urlResponse.getDescription(),LONG2SHORTURL)){</span>
+<span class="nc" id="L32">           long2ShortUrl(urlReq, urlResponse);</span>
+       }else{
+<span class="nc" id="L34">           short2LongUrl(urlReq, urlResponse);</span>
+       }
+
+<span class="nc" id="L37">    }</span>
+
+    private void long2ShortUrl(UrlRequest longUrlReq, UrlResponse urlResponse){
+        //1.先在内存中查询关键字longUrl是否存在
+<span class="nc" id="L41">        log.info(&quot;{} long Url {}&quot;,  longUrlReq.getRequestId(), longUrlReq.getLongUrl());</span>
+        //要做一个长度过滤
+<span class="nc" id="L43">        String shortUrl = caffeineCache.getIfPresent(longUrlReq.getLongUrl());</span>
+<span class="nc bnc" id="L44" title="All 4 branches missed.">        if ( shortUrl == null || StringUtils.isBlank(shortUrl)) {</span>
+<span class="nc" id="L45">            long id = IdWorkerInstance.INSTANCE.IdWorkerInstance().generate();</span>
+<span class="nc" id="L46">            shortUrl = ConversionUtil.encode(id,11);</span>
+<span class="nc" id="L47">            int length = shortUrl.length();</span>
+<span class="nc" id="L48">            shortUrl= shortUrlPrefix +  shortUrl.substring(length - 8, length);</span>
+<span class="nc" id="L49">            caffeineCache.put(longUrlReq.getLongUrl(), shortUrl);</span>
+            //2.3 在存入已端域名为key,value为shortUrl为对象保存入缓存,便于做反向解析
+<span class="nc" id="L51">            caffeineCache.put(shortUrl, longUrlReq.getLongUrl());</span>
+        }
+
+<span class="nc" id="L54">        urlResponse.setRequestId(longUrlReq.getRequestId());</span>
+<span class="nc" id="L55">        urlResponse.setDescription(LONG2SHORTURL);</span>
+<span class="nc" id="L56">        urlResponse.setLongUrl(longUrlReq.getLongUrl());</span>
+<span class="nc" id="L57">        urlResponse.setShortUrl(shortUrl);</span>
+
+<span class="nc" id="L59">    }</span>
+
+    private void short2LongUrl(UrlRequest shortUrlReq, UrlResponse urlResponse){
+<span class="nc" id="L62">        log.info(&quot;{} short request {}&quot;,  shortUrlReq.getRequestId(), shortUrlReq.getShortUrl());</span>
+<span class="nc" id="L63">        String  longUrl = caffeineCache.getIfPresent(shortUrlReq.getShortUrl());</span>
+<span class="nc bnc" id="L64" title="All 4 branches missed.">        if ( longUrl == null || StringUtils.isBlank(longUrl)) {</span>
+<span class="nc" id="L65">            urlResponse.setLongUrl(&quot;&quot;);</span>
+<span class="nc" id="L66">            urlResponse.setErrMsg(&quot;链接失效或存在&quot;);</span>
+
+<span class="nc" id="L68">            return ;</span>
+        }
+<span class="nc" id="L70">        urlResponse.setRequestId(shortUrlReq.getRequestId());</span>
+<span class="nc" id="L71">        urlResponse.setDescription(SHORT2LONGURL);</span>
+<span class="nc" id="L72">        urlResponse.setLongUrl(longUrl);</span>
+<span class="nc" id="L73">        urlResponse.setShortUrl(shortUrlReq.getShortUrl());</span>
+<span class="nc" id="L74">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>
